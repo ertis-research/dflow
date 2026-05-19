@@ -4,7 +4,7 @@ This runbook provides operational procedures, health checks, and troubleshooting
 
 ---
 
-## 1. 🏗️ Architecture Overview
+## 1. Architecture Overview
 
 When a user submits an experiment, the following sequence occurs:
 1. **API (FastAPI)** receives the CSV and JSON config.
@@ -15,7 +15,7 @@ When a user submits an experiment, the following sequence occurs:
 
 ---
 
-## 2. 🩺 Health Checks
+## 2. Health Checks
 
 ### 2.1 Check API Status
 ```bash
@@ -37,7 +37,7 @@ Ensure the environment variables in `.env` are pointing to reachable IPs/Domains
 
 ---
 
-## 3. 🚨 Troubleshooting & Common Issues
+## 3. Troubleshooting & Common Issues
 
 ### Issue 1: Kubernetes Pod Fails Immediately (Status: `Error`)
 
@@ -84,7 +84,7 @@ kubectl describe pod <pod-name> -n api-dlflow
 
 ---
 
-## 4. 🧹 Maintenance Operations
+## 4. Maintenance Operations
 
 ### 4.1 Cleaning up Old Kubernetes Jobs
 To prevent the cluster from filling up with completed or failed jobs, periodically clean them up:
