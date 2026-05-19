@@ -1,0 +1,10 @@
+fastapi==0.136.1
+uvicorn==0.47.0
+minio==7.2.20
+kubernetes==35.0.0
+python-dotenv==1.2.2
+python-multipart==0.0.28
+PyYAML==6.0.3
+requests==2.34.2
+mlflow
+ludwig
