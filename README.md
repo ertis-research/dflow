@@ -76,7 +76,7 @@ Create a `.env` file in the project root:
 MINIO_URL=minio.your-domain.com
 MINIO_ACCESS_KEY=your_access_key
 MINIO_SECRET_KEY=your_secret_key
-BUCKET_NAME=opentwins-demos
+BUCKET_NAME=your_bucket_name
 KUBERNETES_CONFIG_PATH=~/.kube/config
 KUBERNETES_NAMESPACE=api-dlflow
 MLFLOW_TRACKING_URI=http://your-mlflow-ip:63163
