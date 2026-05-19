@@ -1,4 +1,4 @@
-# 🚑 DFlow API - Runbook & Troubleshooting Guide
+# DFlow API - Runbook & Troubleshooting Guide
 
 This runbook provides operational procedures, health checks, and troubleshooting steps for the DFlow API and its underlying infrastructure (Kubernetes, MinIO, and MLflow).
 
