@@ -2,6 +2,8 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import uuid
+import os
+import mlflow
 
 # Import our modular functions
 # Importamos nuestras funciones modulares indicando la carpeta src
@@ -29,12 +31,12 @@ def home():
     """Root endpoint to verify the API is running."""
     return {"message": "Welcome to the dflow API. Go to /docs to view the interface."}
 
-@app.get("/experiments")
+@app.get("/api/mlops/experiments")
 def get_experiments():
     """Returns the list of all running and completed experiments."""
     return {"experiments": fake_database}
 
-@app.post("/experiment")
+@app.post("/api/mlops/experiment")
 async def create_experiment(
     background_tasks: BackgroundTasks,
     csv_file: UploadFile = File(...),
@@ -97,11 +99,36 @@ async def create_experiment(
         "details": fake_database[experiment_id]
     }
 
-@app.delete("/experiment/{experiment_id}")
+mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
+if mlflow_uri:
+    mlflow.set_tracking_uri(mlflow_uri)
+
+@app.delete("/api/mlops/experiment/{experiment_id}")
 def delete_experiment(experiment_id: str):
-    """Deletes an experiment by its unique ID."""
+    """Deletes an experiment by its unique ID from the local DB and MLflow."""
     if experiment_id not in fake_database:
         raise HTTPException(status_code=404, detail="Experiment not found")
         
+    # 1. Recuperar el nombre del experimento ANTES de borrarlo de la base local
+    exp_data = fake_database[experiment_id]
+    mlflow_exp_name = exp_data.get("experiment_name")
+    
+    # 2. Intentar borrar en MLflow (operación de red muy rápida)
+    if mlflow_exp_name and mlflow_uri:
+        try:
+            # Buscar el experimento en MLflow por su nombre
+            mlflow_exp = mlflow.get_experiment_by_name(mlflow_exp_name)
+            
+            # Si existe y no está ya borrado, lo eliminamos
+            if mlflow_exp and mlflow_exp.lifecycle_stage != "deleted":
+                mlflow.delete_experiment(mlflow_exp.experiment_id)
+                print(f"MLflow: Experimento '{mlflow_exp_name}' eliminado.")
+        except Exception as e:
+            # Si MLflow falla (ej. servidor caído), lo capturamos para que no 
+            # rompa la API y permita borrar al menos el registro local
+            print(f"Error borrando en MLflow: {str(e)}")
+
+    # 3. Borrar de la base de datos local (fake_database)
     del fake_database[experiment_id]
+    
     return {"message": f"Experiment {experiment_id} successfully deleted"}
