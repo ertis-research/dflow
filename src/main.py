@@ -33,8 +33,46 @@ def home():
 
 @app.get("/api/mlops/experiments")
 def get_experiments():
-    """Returns the list of all running and completed experiments."""
-    return {"experiments": fake_database}
+    """
+    Returns experiments from both local tracking (K8s Jobs in progress) 
+    and MLflow history (completed/archived), indexed by their name.
+    """
+    # Use name as the key for the merged dict to simplify frontend interaction
+    merged_experiments = {}
+    
+    # 1. Start with the local database (currently running or pending jobs)
+    for eid, data in fake_database.items():
+        name = data.get("experiment_name", f"local-{eid}")
+        merged_experiments[name] = {
+            "internal_id": eid,
+            **data
+        }
+
+    # 2. Query MLflow for persistent history
+    if mlflow_uri:
+        try:
+            # Fetch all active experiments from the MLflow server
+            mlflow_exps = mlflow.search_experiments()
+            
+            for exp in mlflow_exps:
+                # Skip the default empty experiment
+                if exp.name == "Default":
+                    continue
+                    
+                # If name already exists in merged (from local), we keep the local version
+                # as it contains more real-time status (like "training_in_k8s")
+                if exp.name not in merged_experiments:
+                    merged_experiments[exp.name] = {
+                        "experiment_name": exp.name,
+                        "status": "completed (mlflow)",
+                        "model": "historical_or_external",
+                        "mlflow_id": exp.experiment_id,
+                        "artifact_location": exp.artifact_location
+                    }
+        except Exception as e:
+            print(f"Error reading from MLflow: {str(e)}")
+
+    return {"experiments": merged_experiments}
 
 @app.post("/api/mlops/experiment")
 async def create_experiment(
@@ -103,32 +141,33 @@ mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
 if mlflow_uri:
     mlflow.set_tracking_uri(mlflow_uri)
 
-@app.delete("/api/mlops/experiment/{experiment_id}")
-def delete_experiment(experiment_id: str):
-    """Deletes an experiment by its unique ID from the local DB and MLflow."""
-    if experiment_id not in fake_database:
-        raise HTTPException(status_code=404, detail="Experiment not found")
-        
-    # 1. Recuperar el nombre del experimento ANTES de borrarlo de la base local
-    exp_data = fake_database[experiment_id]
-    mlflow_exp_name = exp_data.get("experiment_name")
-    
-    # 2. Intentar borrar en MLflow (operación de red muy rápida)
-    if mlflow_exp_name and mlflow_uri:
+@app.delete("/api/mlops/experiment/{experiment_name}")
+def delete_experiment(experiment_name: str):
+    """Deletes an experiment by its NAME from both the local DB and MLflow."""
+    found = False
+
+    # 1. Search and delete from local database
+    keys_to_delete = [k for k, v in fake_database.items() if v.get("experiment_name") == experiment_name]
+    for k in keys_to_delete:
+        del fake_database[k]
+        found = True
+        print(f"Local DB: Experiment '{experiment_name}' (ID: {k}) deleted.")
+
+    # 2. Search and delete from MLflow
+    if mlflow_uri:
         try:
             # Buscar el experimento en MLflow por su nombre
-            mlflow_exp = mlflow.get_experiment_by_name(mlflow_exp_name)
-            
+            mlflow_exp = mlflow.get_experiment_by_name(experiment_name)
+
             # Si existe y no está ya borrado, lo eliminamos
             if mlflow_exp and mlflow_exp.lifecycle_stage != "deleted":
                 mlflow.delete_experiment(mlflow_exp.experiment_id)
-                print(f"MLflow: Experimento '{mlflow_exp_name}' eliminado.")
+                found = True
+                print(f"MLflow: Experiment '{experiment_name}' deleted.")
         except Exception as e:
-            # Si MLflow falla (ej. servidor caído), lo capturamos para que no 
-            # rompa la API y permita borrar al menos el registro local
-            print(f"Error borrando en MLflow: {str(e)}")
+            print(f"Error deleting from MLflow: {str(e)}")
 
-    # 3. Borrar de la base de datos local (fake_database)
-    del fake_database[experiment_id]
-    
-    return {"message": f"Experiment {experiment_id} successfully deleted"}
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Experiment '{experiment_name}' not found in local DB or MLflow")
+
+    return {"message": f"Experiment '{experiment_name}' successfully deleted"}
