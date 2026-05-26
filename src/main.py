@@ -171,3 +171,59 @@ def delete_experiment(experiment_name: str):
         raise HTTPException(status_code=404, detail=f"Experiment '{experiment_name}' not found in local DB or MLflow")
 
     return {"message": f"Experiment '{experiment_name}' successfully deleted"}
+
+@app.get("/api/mlops/runs/{experiment_name}")
+def get_runs(experiment_name: str):
+    """
+    Returns the list of runs for a given experiment name from MLflow.
+    Includes metrics, parameters, and tags for each run.
+    """
+    if not mlflow_uri:
+        raise HTTPException(status_code=500, detail="MLflow tracking URI is not configured")
+
+    try:
+        # 1. Find the experiment by name in MLflow
+        mlflow_exp = mlflow.get_experiment_by_name(experiment_name)
+        if not mlflow_exp:
+            # If the experiment doesn't exist in MLflow yet, return an empty list
+            return {"runs": []}
+
+        # 2. Search runs for this experiment, ordered by start_time descending (latest first)
+        # Note: MLflow search_runs can return a lot of columns, we'll clean them up
+        runs_df = mlflow.search_runs(
+            experiment_ids=[mlflow_exp.experiment_id],
+            order_by=["attribute.start_time DESC"]
+        )
+        
+        # 3. Process the DataFrame to ensure JSON serializable types and consistent keys
+        runs = []
+        for _, row in runs_df.iterrows():
+            run_dict = row.to_dict()
+            
+            # Ensure we have consistent base keys for the frontend
+            clean_run = {
+                "run_id": str(row.get("run_id", "")),
+                "status": str(row.get("status", "UNKNOWN")),
+                # Convert start_time to ISO format string if it's a datetime
+                "start_time": row["start_time"].isoformat() if hasattr(row["start_time"], "isoformat") else str(row["start_time"]),
+            }
+            
+            # Add all other metrics, params, and tags
+            for key, value in run_dict.items():
+                if key not in ["run_id", "status", "start_time"]:
+                    # Handle NaN/None for JSON
+                    if value != value or value is None: # value != value is a check for NaN
+                        clean_run[key] = ""
+                    elif hasattr(value, "isoformat"):
+                        clean_run[key] = value.isoformat()
+                    else:
+                        clean_run[key] = value
+            
+            runs.append(clean_run)
+            
+        return {"runs": runs}
+
+    except Exception as e:
+        print(f"Error searching runs in MLflow for '{experiment_name}': {str(e)}")
+        # If it's a known error from mlflow or pandas, we catch it
+        raise HTTPException(status_code=500, detail=f"Error searching runs in MLflow: {str(e)}")
