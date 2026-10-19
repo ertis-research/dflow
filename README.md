@@ -42,7 +42,7 @@ To run this project, the following dependencies must be configured in your envir
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/dflow.git
+git clone https://github.com/ertis-research/dflow.git
 cd dflow
 ```
 
@@ -97,13 +97,15 @@ python -m uvicorn src.main:app --reload --port 8000
 The API follows a modular path structure. Interactive documentation is available at `http://localhost:8000/docs`.
 
 ### 1. List Experiments
+
 * **Method:** `GET`
 * **Path:** `/api/mlops/experiments`
 * **Description:** Returns a merged list of experiments from the local tracking database (active jobs) and MLflow history.
 
 ### 2. Create Experiment
+
 * **Method:** `POST`
-* **Path:** `/api/mlops/experiment`
+* **Path:** `/api/mlops/experiments`
 * **Description:** Initializes a new training job.
 * **Multipart Fields:**
     | Field             | Description                                                        |
@@ -118,7 +120,7 @@ The API follows a modular path structure. Interactive documentation is available
 #### Example cURL Request
 
 ```bash
-curl -X POST "http://localhost:8000/api/mlops/experiment" \
+curl -X POST "http://localhost:8000/api/mlops/experiments" \
   -F "csv_file=@data.csv" \
   -F "model_type=Ludwig_Test" \
   -F "experiment_name=Predictive_Maintenance" \
@@ -131,13 +133,15 @@ curl -X POST "http://localhost:8000/api/mlops/experiment" \
 ```
 
 ### 3. Delete Experiment
+
 * **Method:** `DELETE`
-* **Path:** `/api/mlops/experiment/{experiment_name}`
+* **Path:** `/api/mlops/experiments/{experiment_name}`
 * **Description:** Removes the experiment from both the local database and the MLflow Tracking Server.
 
 ### 4. Get Runs
+
 * **Method:** `GET`
-* **Path:** `/api/mlops/runs/{experiment_name}`
+* **Path:** `/api/mlops/experiments/{experiment_name}/runs`
 * **Description:** Retrieves all training runs associated with the experiment name from MLflow, including metrics and parameters.
 
 ---

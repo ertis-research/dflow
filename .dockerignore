@@ -1,0 +1,19 @@
+# Virtual environments
+venv/
+env/
+.env/
+.venv/
+
+# Git
+.git/
+.gitignore
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE and local configs
+.vscode/
+.idea/

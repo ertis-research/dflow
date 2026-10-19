@@ -12,6 +12,7 @@ kubeconfig_path = os.path.expanduser(raw_kube_path)
 
 # Extraemos el namespace con un valor por defecto seguro
 k8s_namespace = os.getenv("KUBERNETES_NAMESPACE", "default")
+bucketname = os.getenv("BUCKET_NAME", "opentwins-demo")
 
 try:
     # Pass the exact path to the configuration loading function
@@ -21,7 +22,7 @@ except Exception as e:
     print("FATAL ERROR: Could not load Kubernetes configuration.")
     print(f"Details: {str(e)}")
 
-async def train_model_job(experiment_id: str, model_type: str, config: dict, minio_path: str, experiment_name: str, model_name: str, bucket_name: str = "opentwins-demos"):
+async def train_model_job(experiment_id: str, model_type: str, config: dict, minio_path: str, experiment_name: str, model_name: str, bucket_name: str =bucketname):
     """
     Creates a Kubernetes Job that downloads data from MinIO, trains a model using Ludwig,
     and automatically logs metrics and registers the model in MLflow.
@@ -154,6 +155,13 @@ except Exception as e:
     )
     
     try:
+        from kubernetes import config
+        
+        # ADD THESE LINES to configure the client to run inside the pod
+        try:
+            config.load_incluster_config()
+        except config.ConfigException:
+            config.load_kube_config() # Fallback for local testing
         batch_v1 = client.BatchV1Api()
         batch_v1.create_namespaced_job(namespace=os.getenv("KUBERNETES_NAMESPACE"), body=job)
         print(f"[{experiment_id}] Ludwig Training Job launched in Kubernetes: {job_name}")
