@@ -18,7 +18,7 @@ spec:
         - name: model-registry-creds
       containers:
       - name: dflow
-        image: docker.ertis.uma.es/bentloy-test/dflow:lastest
+        image: REGISTRY/PROJECT/dflow:lastest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000

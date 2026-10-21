@@ -90,6 +90,52 @@ MLFLOW_TRACKING_URI=http://your-mlflow-ip:63163
 python -m uvicorn src.main:app --reload --port 8000
 ```
 
+## Docker and Kubernetes Deployment
+
+### 1. Build docker image
+
+```bash
+docker build -t <YOUR_REGISTRY>/<YOUR_PROJECT>/dflow:latest ./
+```
+
+### 2. Push docker image into registry
+
+```bash
+docker push <YOUR_REGISTRY>/<YOUR_PROJECT>/dflow:latest
+```
+
+After the image is pushed, it can be initialized using docker or it can be deployed on Kubernetes if wanted.
+
+### 3. Deployment
+
+Depending on the user's needs, it can be either locally deployed using Docker or use a Kubernetes pod:
+
+#### 3.1. Docker deployment
+
+```bash
+docker run -p 8000:8000 <YOUR_REGISTRY>/<YOUR_PROJECT>/dflow:latest
+```
+
+#### 3.2. Kubernetes deployment
+
+Before running any Kubernetes command, replace in deployment.yaml the dynamic data regarding the docker image name.
+
+```bash
+kubectl apply -f ./deployment.yaml -n <YOUR_K8S_NAMESPACE>
+```
+
+Pod status can be checked using the command:
+
+```bash
+kubectl get pods -n <YOUR_K8S_NAMESPACE>
+```
+
+Once deployed, Kubernetes will expose the API through a Service. To find the API adress and port to access the API, run:
+
+```bash
+kubectl get svc -n <YOUR_K8S_NAMESPACE>
+```
+
 ---
 
 ## API Endpoints (Prefix: `/api/mlops`)
@@ -176,11 +222,17 @@ curl -X POST "http://localhost:8000/api/mlops/experiments" \
 │   ├── main.py        # API Entry point and route definitions
 │   ├── k8s_utils.py   # Kubernetes Job orchestration logic
 │   ├── minio_utils.py # Storage interaction utilities
+|   ├── schemas.py     # Schemas definitios
+|   ├── service.py     # Service for core API functionalities 
 │   └── database.py    # Local state tracking (In-memory)
 ├── data/              # Sample datasets
+|   └── data.csv       # Sample dataset for README example POST
 ├── docs/              # Documentation and runbooks
 ├── requirements.txt
 ├── .env
+├── .dockerignore
+├── Dockerfile
+├── deployment.yaml
 └── README.md
 ```
 
