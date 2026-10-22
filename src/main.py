@@ -39,6 +39,13 @@ def get_experiments(page: int = 0, pageSize: int = 20, search: str = ''):
 
     return service.get_all_experiments(mlflow_uri is not None and len(mlflow_uri)>0, page, pageSize, search)
 
+@app.get("/api/mlops/experiments/{experiment_name}")
+async def get_experiment(experiment_name: str):
+    try:
+        return await service.get_experiment(experiment_name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"There is no experiment with name {str(experiment_name)}")
+
 @app.post("/api/mlops/experiments")
 async def create_experiment(
     background_tasks: BackgroundTasks,
@@ -92,7 +99,6 @@ def delete_experiment(experiment_name: str):
 
     return {"message": f"Experiment '{experiment_name}' successfully deleted"}
 
-# TODO: Pagination
 @app.get("/api/mlops/experiments/{experiment_name}/runs")
 def get_runs(experiment_name: str, page: int = 0, pageSize: int = 20, search: str = ''):
     """

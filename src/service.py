@@ -98,6 +98,50 @@ class DFlowService:
             pagination=metadata
         )
 
+    async def get_experiment(self, experiment_name: str) -> Experiment:
+        print(1)
+        mlflow_exp = mlflow.get_experiment_by_name(experiment_name)
+        print(2)
+        exp = [(k, v) for k, v in fake_database.items() if v.get("experiment_name") == experiment_name]
+        print(3)
+
+        if not mlflow_exp and len(exp)==0:
+            # if it's not either in the local database, return 404
+            raise KeyError()
+        print(4)
+        if not mlflow_exp and len(exp)>0:
+            res_exp = exp[0]
+            return Experiment(
+                experiment_name=experiment_name,
+                source="local",
+                status=res_exp[1].get("status"),
+                internal_id=res_exp[0],
+                mlflow_id=None,  # Local doesn't have this yet
+                artifact_location=None,
+                model=res_exp[1].get("model"),
+                model_name=res_exp[1].get("model_name"),
+                config=res_exp[1].get("config"),
+                dependencies=res_exp[1].get("dependencies", []),
+                csv_filename=res_exp[1].get("csv_filename")
+            )
+
+        assert mlflow_exp is not None
+        print(5)
+        return Experiment(
+            experiment_name=mlflow_exp.name,
+            source="mlflow",
+            status="completed", # MLflow runs are usually completed/logged
+            internal_id=None,
+            mlflow_id=mlflow_exp.experiment_id,
+            artifact_location=mlflow_exp.artifact_location,
+            model=None,         # MLflow API doesn't expose this at this level
+            model_name=None,
+            config=None,
+            dependencies=[],
+            csv_filename=None
+        )
+        
+
     async def create_experiment(self, 
                                 background_tasks: BackgroundTasks, 
                                 csv_file: UploadFile, 
@@ -259,7 +303,11 @@ class DFlowService:
             # if it's not either in the local database, return 404
             raise KeyError()
 
+        if not mlflow_exp and len(exp)>0:
+            return
+
         assert mlflow_exp is not None
+
         runs_df = mlflow.search_runs(
             experiment_ids=[mlflow_exp.experiment_id],
             order_by=["attribute.start_time DESC"]
