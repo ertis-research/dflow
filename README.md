@@ -118,10 +118,14 @@ docker run -p 8000:8000 <YOUR_REGISTRY>/<YOUR_PROJECT>/dflow:latest
 
 #### 3.2. Kubernetes deployment
 
-Before running any Kubernetes command, replace in deployment.yaml the dynamic data regarding the docker image name.
+Before running any Kubernetes command, replace in deployment.yaml and rbac.yaml the dynamic data regarding the docker image name and Kubernetes parameters.
 
 ```bash
 kubectl apply -f ./deployment.yaml -n <YOUR_K8S_NAMESPACE>
+```
+
+```bash
+kubectl apply -f ./rbac.yaml -n <YOUR_K8S_NAMESPACE>
 ```
 
 Pod status can be checked using the command:

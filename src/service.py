@@ -99,16 +99,12 @@ class DFlowService:
         )
 
     async def get_experiment(self, experiment_name: str) -> Experiment:
-        print(1)
         mlflow_exp = mlflow.get_experiment_by_name(experiment_name)
-        print(2)
         exp = [(k, v) for k, v in fake_database.items() if v.get("experiment_name") == experiment_name]
-        print(3)
 
         if not mlflow_exp and len(exp)==0:
             # if it's not either in the local database, return 404
             raise KeyError()
-        print(4)
         if not mlflow_exp and len(exp)>0:
             res_exp = exp[0]
             return Experiment(
@@ -126,11 +122,10 @@ class DFlowService:
             )
 
         assert mlflow_exp is not None
-        print(5)
         return Experiment(
             experiment_name=mlflow_exp.name,
             source="mlflow",
-            status="completed", # MLflow runs are usually completed/logged
+            status="completed",# MLflow runs are usually completed/logged
             internal_id=None,
             mlflow_id=mlflow_exp.experiment_id,
             artifact_location=mlflow_exp.artifact_location,

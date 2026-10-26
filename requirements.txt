@@ -7,4 +7,4 @@ python-multipart==0.0.28
 PyYAML==6.0.3
 requests==2.34.2
 mlflow
-ludwig
+ludwig==0.17.9
