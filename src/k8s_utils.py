@@ -145,7 +145,7 @@ except Exception as e:
     )
     
     job_name = f"train-job-{experiment_id.lower()}"
-    job_spec = client.V1JobSpec(template=template, backoff_limit=1)
+    job_spec = client.V1JobSpec(template=template, backoff_limit=1, ttl_seconds_after_finished=60)
     
     job = client.V1Job(
         api_version="batch/v1",

@@ -18,7 +18,7 @@ class DFlowService:
 
     def get_local_experiments(self) -> Generator[Experiment, None, None]:
         for eid, data in fake_database.items():
-            name = data.get("experiment_name", f"local-{eid}")
+            name = data.get("experiment_name", f"{eid}")
             yield Experiment(
                 experiment_name=name,
                 source="local",
@@ -100,7 +100,9 @@ class DFlowService:
 
     async def get_experiment(self, experiment_name: str) -> Experiment:
         mlflow_exp = mlflow.get_experiment_by_name(experiment_name)
+        print(fake_database)
         exp = [(k, v) for k, v in fake_database.items() if v.get("experiment_name") == experiment_name]
+        existsLocal = len(exp)>0
 
         if not mlflow_exp and len(exp)==0:
             # if it's not either in the local database, return 404
@@ -122,18 +124,20 @@ class DFlowService:
             )
 
         assert mlflow_exp is not None
+        res_exp = exp[0] if existsLocal else None
+        print(res_exp)
         return Experiment(
             experiment_name=mlflow_exp.name,
             source="mlflow",
             status="completed",# MLflow runs are usually completed/logged
-            internal_id=None,
+            internal_id= None if not res_exp else res_exp[0],
             mlflow_id=mlflow_exp.experiment_id,
             artifact_location=mlflow_exp.artifact_location,
-            model=None,         # MLflow API doesn't expose this at this level
-            model_name=None,
-            config=None,
-            dependencies=[],
-            csv_filename=None
+            model=None if not res_exp else res_exp[1].get("model"),         # MLflow API doesn't expose this at this level
+            model_name=None if not res_exp else res_exp[1].get("model_name"),
+            config=None if not res_exp else res_exp[1].get("config"),
+            dependencies=[] if not res_exp else res_exp[1].get("dependencies", []),
+            csv_filename=None if not res_exp else res_exp[1].get("csv_filename")
         )
         
 
