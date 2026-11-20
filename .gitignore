@@ -2,3 +2,9 @@
 __pycache__/
 *.pyc
 venv/
+# Local training store (SQLite)
+data/*.db
+data/*.db-*
+.claude/
+.venv/
+.pytest_cache/
