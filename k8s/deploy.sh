@@ -2,9 +2,12 @@
 # Deploys dflow to Kubernetes using the values of a .env file.
 #
 #   k8s/deploy.sh [ENV_FILE]          (default: .env in the repository root)
-#   DRY_RUN=1 k8s/deploy.sh           (validate everything, change nothing)
+#   DRY_RUN=1 k8s/deploy.sh           (validate everything, change nothing, build nothing)
+#   SKIP_BUILD=1 k8s/deploy.sh        (deploy the image already in the registry)
 #
 # From the .env file it:
+#   0. builds the dflow image from the repository and pushes it as DFLOW_IMAGE
+#      (with your own "docker login": REGISTRY_* is a pull-only account);
 #   1. creates/updates the "dflow-minio-credentials" Secret with dflow's configuration;
 #   2. creates/updates the "dflow-registry-creds" pull Secret, if REGISTRY_* are set;
 #   3. applies k8s/rbac.yaml and k8s/deployment.yaml (with DFLOW_IMAGE as the image)
@@ -18,6 +21,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${1:-$ROOT/.env}"
 DRY_RUN="${DRY_RUN:-0}"
+SKIP_BUILD="${SKIP_BUILD:-0}"
 
 CONFIG_SECRET="dflow-minio-credentials"
 PULL_SECRET="dflow-registry-creds"
@@ -34,6 +38,10 @@ info() { echo "==> $*"; }
 
 [[ -f "$ENV_FILE" ]] || die "env file not found: $ENV_FILE (copy .env.example to .env and fill it in)"
 command -v kubectl >/dev/null || die "kubectl is not installed or not in PATH"
+if [[ "$DRY_RUN" != "1" && "$SKIP_BUILD" != "1" ]]; then
+    command -v docker >/dev/null || die "docker is not installed or not in PATH (or use SKIP_BUILD=1 to deploy the image already in the registry)"
+    docker info >/dev/null 2>&1 || die "docker is not running (start Docker Desktop, or use SKIP_BUILD=1)"
+fi
 
 # ---- Parse the .env file (same rules as python-dotenv for the usual cases) ----------
 declare -A ENV=()
@@ -74,6 +82,19 @@ info "Namespace: $NAMESPACE"
 info "Image:     $IMAGE"
 "${KUBECTL[@]}" get secrets >/dev/null 2>&1 \
     || die "namespace '$NAMESPACE' does not exist or you have no access to it (check KUBERNETES_NAMESPACE and your kubeconfig)"
+
+# ---- 0. Build and push the image ---------------------------------------------------
+if [[ "$DRY_RUN" == "1" ]]; then
+    info "Image build: skipped (dry run)"
+elif [[ "$SKIP_BUILD" == "1" ]]; then
+    info "Image build: skipped (SKIP_BUILD=1), deploying the image already in the registry"
+else
+    info "Building $IMAGE from $ROOT"
+    docker build -t "$IMAGE" "$ROOT" || die "docker build failed"
+    info "Pushing $IMAGE"
+    docker push "$IMAGE" \
+        || die "docker push failed. Log in with an account that can push to that project: docker login ${IMAGE%%/*} (REGISTRY_* is pull-only)"
+fi
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT

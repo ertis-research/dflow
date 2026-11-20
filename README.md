@@ -87,7 +87,7 @@ MINIO_SECRET_KEY=your_secret_key
 BUCKET_NAME=your_bucket_name
 KUBERNETES_CONFIG_PATH=~/.kube/config
 KUBERNETES_NAMESPACE=<YOUR_K8S_NAMESPACE>
-MLFLOW_TRACKING_URI=http://your-mlflow-ip:63163
+MLFLOW_TRACKING_URI=http://your-mlflow-host:5000
 
 # Training store (see "Training store" below)
 DB_BACKEND=sqlite
@@ -174,28 +174,31 @@ docker run -p 8000:8000 <YOUR_REGISTRY>/<YOUR_PROJECT>/dflow:latest
 #### 3.2. Kubernetes deployment
 
 `k8s/deploy.sh` deploys dflow from your `.env` file (see `.env.example`). It:
+0. builds the image from the repository and pushes it as `DFLOW_IMAGE` (`docker build` + `docker push`). The push uses your own `docker login` on the registry, since `REGISTRY_*` is a pull-only account;
 1. creates or updates the `dflow-minio-credentials` Secret with dflow's configuration;
 2. creates or updates the `dflow-registry-creds` pull Secret, if `REGISTRY_*` are set;
 3. applies `k8s/rbac.yaml` and `k8s/deployment.yaml` in the `KUBERNETES_NAMESPACE` namespace, using `DFLOW_IMAGE` as the image;
 4. restarts dflow so it reads the new configuration and pulls the image again.
 
 ```bash
-DRY_RUN=1 k8s/deploy.sh    # validate against the cluster, change nothing
-k8s/deploy.sh              # deploy (or k8s/deploy.sh path/to/other.env)
+docker login <YOUR_REGISTRY>    # once, with an account that can push to the image's project
+DRY_RUN=1 k8s/deploy.sh         # validate against the cluster, change nothing, build nothing
+k8s/deploy.sh                   # build, push and deploy (or k8s/deploy.sh path/to/other.env)
+SKIP_BUILD=1 k8s/deploy.sh      # deploy the image already in the registry (e.g. only .env changed)
 ```
 
-It needs bash and `kubectl` (on Windows, run it from Git Bash). Credentials never go into git or into the manifests. The Secrets are written with `create`/`replace`, not `kubectl apply`, so their values are not copied into the `last-applied-configuration` annotation.
+It needs bash, `kubectl` and Docker (on Windows, run it from Git Bash with Docker Desktop running). Credentials never go into git or into the manifests. The Secrets are written with `create`/`replace`, not `kubectl apply`, so their values are not copied into the `last-applied-configuration` annotation.
 
 What it takes from `.env`:
 
 | Variable | Used for |
 | --- | --- |
 | `KUBERNETES_NAMESPACE` | The namespace where dflow is deployed and where it launches the training Jobs |
-| `DFLOW_IMAGE` | The dflow image to deploy (the one pushed in the previous steps) |
-| `REGISTRY_SERVER`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD` | The `dflow-registry-creds` pull Secret. Required the first time: `deploy.sh` fails if `dflow-registry-creds` does not exist in the namespace and these are not set. An older `model-registry-creds` Secret (e.g. the one in namespaces provisioned by Bentloy) is no longer reused. Once `dflow-registry-creds` exists, you can omit them to keep it |
+| `DFLOW_IMAGE` | The dflow image that the script builds, pushes and deploys |
+| `REGISTRY_SERVER`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD` | The `dflow-registry-creds` pull Secret. Required the first time: `deploy.sh` fails if `dflow-registry-creds` does not exist in the namespace and these are not set. An older `model-registry-creds` Secret is no longer reused. Once `dflow-registry-creds` exists, you can omit them to keep it |
 | Everything else | The `dflow-minio-credentials` Secret, i.e. dflow's configuration. `SQLITE_PATH` and `KUBERNETES_CONFIG_PATH` are local-only and are not copied: in the cluster dflow uses `/data/dflow.db` (the persistent volume) and its service account |
 
-**Registry credentials.** They need **pull permission on the registry project where the image is**; otherwise the pod stays in `ImagePullBackOff` with `401 Unauthorized`. Harbor robot accounts are usually limited to their own project. For example, `robot$bentloy-test-2+bentloy` can pull from `docker.ertis.uma.es/bentloy-test-2/...` but not from `docker.ertis.uma.es/opentwinsv2/...`. Push the image to the robot's project, or give the robot pull permission on the image's project. Use a robot account, not a personal user.
+**Registry credentials.** They need **pull permission on the registry project where the image is**; otherwise the pod stays in `ImagePullBackOff` with `401 Unauthorized`. Harbor robot accounts are usually limited to their own project. For example, a robot of project `project-a` can pull from `<registry>/project-a/...` but not from `<registry>/project-b/...`. Push the image to the robot's project, or give the robot pull permission on the image's project. Use a robot account, not a personal user.
 
 **Without the script.** The manifests need both Secrets to exist and `image:` to be edited by hand:
 
@@ -408,7 +411,7 @@ Cases that return `available: false` (with `logs` empty):
 |   └── data.csv       # Sample dataset for README example POST
 ├── docs/              # Documentation and runbooks
 ├── k8s/               # Kubernetes manifests and deploy script
-│   ├── deploy.sh       # Deploys dflow from .env (Secrets + manifests)
+│   ├── deploy.sh       # Builds, pushes and deploys dflow from .env (image + Secrets + manifests)
 │   ├── deployment.yaml # Deployment, Service and SQLite volume
 │   └── rbac.yaml       # Permissions for training Jobs and pod logs
 ├── requirements.txt
