@@ -1,0 +1,74 @@
+# Deploy with:  k8s/deploy.sh   (reads .env; see README "Kubernetes deployment")
+#
+# The script creates the Secrets this manifest needs from .env and sets the image (DFLOW_IMAGE):
+# - dflow-minio-credentials:    dflow configuration (all its environment variables)
+# - dflow-registry-creds: pull secret for the image (from REGISTRY_SERVER/USERNAME/PASSWORD)
+# Applying this file by hand requires both Secrets to exist and `image:` to be edited.
+#
+# Storage (see README, "Training store"):
+# - Default (DB_BACKEND=sqlite): the database is a file in the dflow-data volume below.
+# - PostgreSQL: DB_BACKEND=postgres and the POSTGRES_* variables in .env; the volume is then unused.
+#   (The optional "dflow-postgres" Secret can hold them instead, if they are managed separately.)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dflow-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dflow
+  labels:
+    app: dflow
+spec:
+  replicas: 1                # SQLite allows a single writer: use DB_BACKEND=postgres for more replicas
+  strategy:
+    type: Recreate           # the ReadWriteOnce volume cannot be mounted by two pods at once
+  selector:
+    matchLabels:
+      app: dflow
+  template:
+    metadata:
+      labels:
+        app: dflow
+    spec:
+      imagePullSecrets:
+        - name: dflow-registry-creds
+      containers:
+      - name: dflow
+        image: REGISTRY/PROJECT/dflow:latest   # replaced by DFLOW_IMAGE from .env (k8s/deploy.sh)
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - secretRef:
+            name: dflow-minio-credentials
+        - secretRef:
+            name: dflow-postgres
+            optional: true
+        volumeMounts:
+        - name: dflow-data
+          mountPath: /data
+      volumes:
+      - name: dflow-data
+        persistentVolumeClaim:
+          claimName: dflow-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dflow-service
+spec:
+  type: LoadBalancer   # Use LoadBalancer for cloud clusters, or NodePort/ClusterIP for local
+  selector:
+    app: dflow
+  ports:
+  - protocol: TCP
+    port: 8000          # Port exposed to the outside
+    targetPort: 8000   # Port uvicorn is listening on inside the container

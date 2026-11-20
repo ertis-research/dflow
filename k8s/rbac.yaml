@@ -1,0 +1,31 @@
+---
+# Apply with: kubectl apply -f k8s/rbac.yaml -n <YOUR_K8S_NAMESPACE>
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dflow-job-creator-role
+rules:
+# Create, inspect and cancel (delete) training Jobs. Their pods are removed by the
+# Kubernetes garbage collector (propagationPolicy=Background).
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "get", "list", "watch", "delete"]
+# Read the training pods and their logs to report why a training failed or is stuck.
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dflow-job-creator-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+roleRef:
+  kind: Role
+  name: dflow-job-creator-role
+  apiGroup: rbac.authorization.k8s.io

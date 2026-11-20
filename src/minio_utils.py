@@ -1,36 +1,66 @@
 import io
-import os
+from typing import Optional
+
 from minio import Minio
-from dotenv import load_dotenv
+from minio.error import MinioException
+from urllib3.exceptions import HTTPError as Urllib3HTTPError
 
-# Load variables from the .env file into the system environment
-load_dotenv()
+from src.config import get_settings
 
-# Read the variables securely from the environment
-MINIO_URL = os.getenv("MINIO_URL")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
-MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
-BUCKET_NAME = os.getenv("BUCKET_NAME")
-# Initialize MinIO client
-minio_client = Minio(
-    MINIO_URL,
-    access_key=MINIO_ACCESS_KEY,
-    secret_key=MINIO_SECRET_KEY,
-    secure=True
-)
+_client: Optional[Minio] = None
 
-if not minio_client.bucket_exists(BUCKET_NAME):
-    minio_client.make_bucket(BUCKET_NAME)
+# What the MinIO client raises on failure: S3Error/ServerError/InvalidResponseError (all
+# MinioException) for error responses, and urllib3 errors when the server is unreachable.
+MINIO_ERRORS = (MinioException, Urllib3HTTPError)
 
-def upload_csv_to_minio(file_content: bytes, experiment_id: str, filename: str) -> str:
+
+def get_minio_client() -> Minio:
+    global _client
+    if _client is None:
+        settings = get_settings()
+        _client = Minio(
+            settings.minio_url,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            secure=settings.minio_secure,
+        )
+    return _client
+
+
+def ensure_bucket() -> None:
+    """Creates the dataset bucket if it does not exist. Called once at startup."""
+    bucket = get_settings().bucket_name
+    client = get_minio_client()
+    if not client.bucket_exists(bucket):
+        client.make_bucket(bucket)
+
+
+def training_data_prefix(training_id: str) -> str:
+    return f"{training_id}/"
+
+
+def upload_csv_to_minio(file_content: bytes, training_id: str, filename: str) -> str:
     """Uploads the file to MinIO and returns the storage path."""
-    minio_path = f"{experiment_id}/{filename}"
-    
-    minio_client.put_object(
-        BUCKET_NAME,
+    minio_path = f"{training_data_prefix(training_id)}{filename}"
+
+    get_minio_client().put_object(
+        get_settings().bucket_name,
         minio_path,
         io.BytesIO(file_content),
         length=len(file_content)
     )
-    
+
     return minio_path
+
+
+def delete_training_data(training_id: str) -> int:
+    """Deletes every object uploaded for a training. Returns how many objects were removed."""
+    bucket = get_settings().bucket_name
+    client = get_minio_client()
+    removed = 0
+    for obj in client.list_objects(bucket, prefix=training_data_prefix(training_id), recursive=True):
+        if obj.object_name is None:
+            continue
+        client.remove_object(bucket, obj.object_name)
+        removed += 1
+    return removed
