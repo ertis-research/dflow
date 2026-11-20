@@ -12,10 +12,10 @@ from typing import Any, Dict, List
 import mlflow
 
 from src.config import get_settings
-from src.database import get_store
-from src.k8s_utils import delete_training_job, job_name_for
-from src.minio_utils import delete_training_data
-from src.mlflow_utils import (
+from src.db.store import get_store
+from src.integrations.k8s import delete_training_job, job_name_for
+from src.integrations.minio_storage import delete_training_data
+from src.integrations.mlflow_tracking import (
     discard_run,
     find_training_runs,
     get_active_experiment,

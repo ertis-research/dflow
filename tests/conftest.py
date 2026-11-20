@@ -25,7 +25,8 @@ from src.config import get_settings  # noqa: E402
 get_settings.cache_clear()
 
 import src.main  # noqa: E402
-import src.service as service_module  # noqa: E402
+import src.services.experiments as experiments_module  # noqa: E402
+import src.services.trainings as trainings_module  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -92,7 +93,7 @@ class FakeCoreApi:
 
 @pytest.fixture
 def k8s(monkeypatch):
-    """Patches the Kubernetes helpers as used in src.service. Returns a configurable state object."""
+    """Patches the Kubernetes helpers as used in src.services.trainings. Returns a configurable state object."""
     state = SimpleNamespace(
         pods=[make_pod()],
         pods_error=None,
@@ -112,9 +113,9 @@ def k8s(monkeypatch):
         state.waiting_calls.append(job_name)
         return state.waiting_reason
 
-    monkeypatch.setattr(service_module, "_job_pods", fake_job_pods)
-    monkeypatch.setattr(service_module, "core_api", lambda: state.core)
-    monkeypatch.setattr(service_module, "get_pod_waiting_reason", fake_waiting)
+    monkeypatch.setattr(trainings_module, "job_pods", fake_job_pods)
+    monkeypatch.setattr(trainings_module, "core_api", lambda: state.core)
+    monkeypatch.setattr(trainings_module, "get_pod_waiting_reason", fake_waiting)
     return state
 
 
@@ -122,6 +123,7 @@ def k8s(monkeypatch):
 def set_store(monkeypatch):
     def _set(active=None, latest=None, history=None):
         store = FakeStore(active=active, latest=latest, history=history)
-        monkeypatch.setattr(service_module, "get_store", lambda: store)
+        monkeypatch.setattr(experiments_module, "get_store", lambda: store)
+        monkeypatch.setattr(trainings_module, "get_store", lambda: store)
         return store
     return _set

@@ -8,16 +8,16 @@ reason, read from the pod logs) while the Job and its pods still exist.
 import asyncio
 from typing import Any, Dict, Optional
 
-from src.cancellation import retry_pending_cancellations
+from src.training.cancellation import retry_pending_cancellations
 from src.config import get_settings
-from src.database import get_store, now_ms
-from src.k8s_utils import (
+from src.db.store import get_store, now_ms
+from src.integrations.k8s import (
     get_pod_failure_reason,
     get_pod_waiting_reason,
     job_state,
     read_training_job,
 )
-from src.mlflow_utils import find_finished_training_run
+from src.integrations.mlflow_tracking import find_finished_training_run
 from src.schemas import ACTIVE_STATUSES
 
 REASON_JOB_GONE = "The training job no longer exists"

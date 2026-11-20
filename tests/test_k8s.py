@@ -1,4 +1,4 @@
-from src.k8s_utils import job_name_for
+from src.integrations.k8s import job_name_for
 
 
 def test_job_name_has_dflow_prefix_and_is_lowercase():

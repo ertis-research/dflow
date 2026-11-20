@@ -382,15 +382,28 @@ Cases that return `available: false` (with `logs` empty):
 ```text
 .
 ├── src/
-│   ├── main.py            # API Entry point and route definitions
-│   ├── config.py          # Settings read from environment variables
-│   ├── k8s_utils.py       # Kubernetes Job orchestration logic
-│   ├── minio_utils.py     # Storage interaction utilities
-│   ├── mlflow_utils.py    # MLflow helpers (runs of a training, cleanup)
-│   ├── training_status.py # Background refresh of training statuses
-│   ├── schemas.py         # Schemas and the training status vocabulary
-│   ├── service.py         # Service for core API functionalities
-│   └── database.py        # Training store (SQLite or PostgreSQL)
+│   ├── main.py                # FastAPI app: lifespan (store, MinIO, status poller), CORS, routers
+│   ├── config.py              # Settings read from environment variables
+│   ├── schemas.py             # Schemas and the training status vocabulary
+│   ├── api/
+│   │   └── experiments.py     # HTTP routes (/api/mlops/experiments...)
+│   ├── services/              # Business logic behind the routes
+│   │   ├── experiments.py     # List/get/create/delete experiments, status resolution
+│   │   ├── trainings.py       # Training pod logs and cancellation
+│   │   ├── runs.py            # MLflow runs of an experiment
+│   │   └── pagination.py      # Shared pagination helper
+│   ├── training/              # Lifecycle of a training in the background
+│   │   ├── launcher.py        # Builds and creates the Kubernetes training Job
+│   │   ├── trainer_script.py  # Script run inside the training pod (Ludwig + MLflow)
+│   │   ├── status.py          # Background refresh of training statuses
+│   │   └── cancellation.py    # Cleanup of cancelled trainings
+│   ├── integrations/          # Clients for external services
+│   │   ├── k8s.py             # Kubernetes API: Jobs, pods, failure reasons
+│   │   ├── minio_storage.py   # MinIO dataset storage
+│   │   └── mlflow_tracking.py # MLflow helpers (runs of a training, cleanup)
+│   └── db/
+│       └── store.py           # Training store (SQLite or PostgreSQL)
+├── tests/             # pytest suite (no external services needed)
 ├── data/              # Sample datasets
 |   └── data.csv       # Sample dataset for README example POST
 ├── docs/              # Documentation and runbooks

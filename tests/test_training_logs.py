@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import pytest
 from kubernetes.client.rest import ApiException
 
-import src.service as service_module
+import src.services.trainings as trainings_module
+from src.services.experiments import RunSummary
 from tests.conftest import FakeCoreApi, make_pod, make_training
 
 URL = "/api/mlops/experiments/my-exp/logs"
@@ -180,11 +181,11 @@ def test_read_other_error_is_502(client, set_store, k8s, status, reason):
 def test_no_local_training_but_in_mlflow(client, set_store, k8s, monkeypatch):
     set_store(active=None, latest=None)
     monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://mlflow.invalid")
-    monkeypatch.setattr(service_module, "get_active_experiment", lambda name: SimpleNamespace(experiment_id="1"))
+    monkeypatch.setattr(trainings_module, "get_active_experiment", lambda name: SimpleNamespace(experiment_id="1"))
     monkeypatch.setattr(
-        service_module.DFlowService,
-        "_summarize_runs",
-        staticmethod(lambda ids: {"1": service_module._RunSummary(latest_status="FINISHED", has_finished=True)}),
+        trainings_module,
+        "summarize_runs",
+        lambda ids: {"1": RunSummary(latest_status="FINISHED", has_finished=True)},
     )
 
     r = client.get(URL)
@@ -202,7 +203,7 @@ def test_no_local_training_but_in_mlflow(client, set_store, k8s, monkeypatch):
 def test_no_local_training_and_not_in_mlflow(client, set_store, k8s, monkeypatch):
     set_store(active=None, latest=None)
     monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://mlflow.invalid")
-    monkeypatch.setattr(service_module, "get_active_experiment", lambda name: None)
+    monkeypatch.setattr(trainings_module, "get_active_experiment", lambda name: None)
 
     r = client.get(URL)
 
@@ -216,7 +217,7 @@ def test_no_local_training_and_mlflow_disabled(client, set_store, k8s, monkeypat
     def must_not_be_called(name):
         raise AssertionError("MLflow must not be queried when disabled")
 
-    monkeypatch.setattr(service_module, "get_active_experiment", must_not_be_called)
+    monkeypatch.setattr(trainings_module, "get_active_experiment", must_not_be_called)
 
     r = client.get(URL)
 
